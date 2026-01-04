@@ -4,6 +4,7 @@ export interface NewsTemplate {
   summary: string;
   confidence: "high" | "medium" | "low";
   source: string;
+  sourceUrl?: string;
   impact: "bullish" | "bearish" | "neutral";
 }
 
@@ -14,6 +15,7 @@ export const newsTemplates: NewsTemplate[] = [
     summary: "Registered silver inventories at COMEX drop to fresh multi-year lows as physical demand continues to exceed supply.",
     confidence: "high",
     source: "COMEX Warehouse Reports",
+    sourceUrl: "https://www.cmegroup.com/markets/metals/precious/silver.html",
     impact: "bullish"
   },
   {
@@ -21,6 +23,7 @@ export const newsTemplates: NewsTemplate[] = [
     summary: "Leading investment bank increases 12-month silver price forecast citing supply constraints and industrial demand.",
     confidence: "high",
     source: "Investment Bank Research",
+    sourceUrl: "https://www.kitco.com/news/silver/",
     impact: "bullish"
   },
   {
@@ -28,6 +31,7 @@ export const newsTemplates: NewsTemplate[] = [
     summary: "Global solar panel manufacturing surge leads to record silver consumption in photovoltaic applications.",
     confidence: "high",
     source: "Silver Institute",
+    sourceUrl: "https://www.silverinstitute.org/",
     impact: "bullish"
   },
   {

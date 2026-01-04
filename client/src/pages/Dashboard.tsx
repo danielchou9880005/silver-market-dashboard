@@ -66,6 +66,7 @@ interface NewsItem {
   confidence: "high" | "medium" | "low";
   timestamp: number;
   source: string;
+  sourceUrl?: string;
   impact: "bullish" | "bearish" | "neutral";
 }
 
@@ -105,6 +106,7 @@ export default function Dashboard() {
       confidence: "high",
       timestamp: now - 3600000,
       source: "Chinese Ministry of Commerce",
+      sourceUrl: "https://www.mofcom.gov.cn/",
       impact: "bullish"
     },
     {
@@ -114,6 +116,7 @@ export default function Dashboard() {
       confidence: "high",
       timestamp: now - 7200000,
       source: "SGE Official Data",
+      sourceUrl: "https://www.sge.com.cn/",
       impact: "bullish"
     },
     {
@@ -123,6 +126,7 @@ export default function Dashboard() {
       confidence: "high",
       timestamp: now - 10800000,
       source: "CME Group",
+      sourceUrl: "https://www.cmegroup.com/markets/metals/precious/silver.html",
       impact: "bullish"
     },
     {
@@ -132,6 +136,7 @@ export default function Dashboard() {
       confidence: "medium",
       timestamp: now - 14400000,
       source: "Industry Sources",
+      sourceUrl: "https://www.reuters.com/markets/commodities/",
       impact: "bullish"
     },
     {
@@ -141,6 +146,7 @@ export default function Dashboard() {
       confidence: "high",
       timestamp: now - 18000000,
       source: "COMEX Warehouse Data",
+      sourceUrl: "https://www.cmegroup.com/markets/metals/precious/silver.html",
       impact: "bullish"
     },
     {
@@ -210,6 +216,7 @@ export default function Dashboard() {
         confidence: template.confidence,
         timestamp: Date.now(),
         source: template.source,
+        sourceUrl: template.sourceUrl,
         impact: template.impact
       };
       
@@ -753,7 +760,7 @@ export default function Dashboard() {
         </div>
 
         {/* News Sidebar */}
-        <div className="w-64 border-l border-border bg-card">
+        <div className="w-[768px] border-l border-border bg-card">
           <div className="p-4 border-b border-border">
             <div className="flex items-center gap-2 mb-1">
               <Newspaper className="w-5 h-5" />
@@ -765,7 +772,11 @@ export default function Dashboard() {
           <ScrollArea className="h-[calc(100vh-80px)]">
             <div className="p-4 space-y-3">
               {newsItems.map((news) => (
-                <Card key={news.id} className="p-3 hover:bg-accent/50 transition-colors">
+                <Card 
+                  key={news.id} 
+                  className="p-3 hover:bg-accent/50 transition-colors cursor-pointer"
+                  onClick={() => news.sourceUrl && window.open(news.sourceUrl, '_blank')}
+                >
                   <div className="flex items-start gap-2 mb-2">
                     {news.impact === "bullish" ? (
                       <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
