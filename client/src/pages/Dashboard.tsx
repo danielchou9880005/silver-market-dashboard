@@ -37,6 +37,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { getRandomNewsTemplate } from "@/data/newsTemplates";
 
 interface MetricData {
   value: number;
@@ -93,24 +94,16 @@ export default function Dashboard() {
     refetchInterval: autoRefresh ? refreshInterval : false,
   });
 
-  // Update current time every minute to refresh timestamps
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(Date.now());
-    }, 60000); // Update every minute
-    return () => clearInterval(timer);
-  }, []);
-
-  // Mock news data with dynamic timestamps
-  const newsItems = useMemo<NewsItem[]>(() => {
-    const baseTime = currentTime;
+  // Initialize news items with starting data
+  const [newsItems, setNewsItems] = useState<NewsItem[]>(() => {
+    const now = Date.now();
     return [
     {
       id: "1",
       title: "China Export Restrictions Take Effect",
       summary: "China officially implements silver export restrictions starting January 1, 2026. Government confirms policy.",
       confidence: "high",
-      timestamp: baseTime - 3600000,
+      timestamp: now - 3600000,
       source: "Chinese Ministry of Commerce",
       impact: "bullish"
     },
@@ -119,7 +112,7 @@ export default function Dashboard() {
       title: "Shanghai Premium Hits Record $12",
       summary: "Shanghai Gold Exchange silver premium over COMEX reaches unprecedented $12/oz, indicating severe decoupling.",
       confidence: "high",
-      timestamp: baseTime - 7200000,
+      timestamp: now - 7200000,
       source: "SGE Official Data",
       impact: "bullish"
     },
@@ -128,7 +121,7 @@ export default function Dashboard() {
       title: "CME Raises Margins 62.5% in 4 Days",
       summary: "Chicago Mercantile Exchange implements emergency margin hikes totaling 62.5% increase over 4-day period.",
       confidence: "high",
-      timestamp: baseTime - 10800000,
+      timestamp: now - 10800000,
       source: "CME Group",
       impact: "bullish"
     },
@@ -137,7 +130,7 @@ export default function Dashboard() {
       title: "Tesla Reportedly Stockpiling Silver",
       summary: "Unconfirmed reports suggest Tesla is building 6-month silver inventory ahead of solid-state battery production.",
       confidence: "medium",
-      timestamp: baseTime - 14400000,
+      timestamp: now - 14400000,
       source: "Industry Sources",
       impact: "bullish"
     },
@@ -146,7 +139,7 @@ export default function Dashboard() {
       title: "COMEX Registered Inventory Drops Below 30M oz",
       summary: "Available silver for delivery at COMEX warehouses falls to critical 30.2M oz level.",
       confidence: "high",
-      timestamp: baseTime - 18000000,
+      timestamp: now - 18000000,
       source: "COMEX Warehouse Data",
       impact: "bullish"
     },
@@ -155,7 +148,7 @@ export default function Dashboard() {
       title: "Retail Premiums Surge to $8-12 Over Spot",
       summary: "Major dealers (APMEX, JM Bullion) report premiums 3-4x normal levels as retail demand surges.",
       confidence: "high",
-      timestamp: baseTime - 21600000,
+      timestamp: now - 21600000,
       source: "Dealer Websites",
       impact: "bullish"
     },
@@ -164,7 +157,7 @@ export default function Dashboard() {
       title: "Rumors of COMEX Force Majeure Preparation",
       summary: "Unverified claims that COMEX is preparing contingency plans for potential delivery defaults.",
       confidence: "low",
-      timestamp: baseTime - 25200000,
+      timestamp: now - 25200000,
       source: "Anonymous Traders",
       impact: "bullish"
     },
@@ -173,7 +166,7 @@ export default function Dashboard() {
       title: "Samsung Increases Silver Purchasing",
       summary: "Reports indicate Samsung Electronics has increased silver procurement by 40% for Q1 2026.",
       confidence: "medium",
-      timestamp: baseTime - 28800000,
+      timestamp: now - 28800000,
       source: "Supply Chain Reports",
       impact: "bullish"
     },
@@ -182,7 +175,7 @@ export default function Dashboard() {
       title: "Indian Import Duties Under Review",
       summary: "Indian government considering reduction of silver import duties to ease domestic supply constraints.",
       confidence: "medium",
-      timestamp: baseTime - 32400000,
+      timestamp: now - 32400000,
       source: "Economic Times India",
       impact: "bearish"
     },
@@ -191,12 +184,56 @@ export default function Dashboard() {
       title: "New Mexican Mine Production Delayed",
       summary: "Major silver mine in Mexico reports 6-month delay in production ramp-up due to equipment issues.",
       confidence: "high",
-      timestamp: baseTime - 36000000,
+      timestamp: now - 36000000,
       source: "Mining Company Press Release",
       impact: "bullish"
     }
   ];
-  }, [currentTime]);
+  });
+
+  // Update current time every minute to refresh timestamps
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 60000); // Update every minute
+    return () => clearInterval(timer);
+  }, []);
+
+  // Add new news items periodically (every 2-5 minutes)
+  useEffect(() => {
+    const addNewsItem = () => {
+      const template = getRandomNewsTemplate();
+      const newItem: NewsItem = {
+        id: `news-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        title: template.title,
+        summary: template.summary,
+        confidence: template.confidence,
+        timestamp: Date.now(),
+        source: template.source,
+        impact: template.impact
+      };
+      
+      setNewsItems(prev => [newItem, ...prev]); // Add to top
+      
+      // Optional: Show a subtle notification
+      // toast.info("New market update", { duration: 2000 });
+    };
+
+    // Add first new item after 2 minutes
+    const initialDelay = 2 * 60 * 1000;
+    const initialTimer = setTimeout(addNewsItem, initialDelay);
+
+    // Then add new items every 3-5 minutes (random interval)
+    const recurringTimer = setInterval(() => {
+      const randomDelay = (3 + Math.random() * 2) * 60 * 1000; // 3-5 minutes
+      setTimeout(addNewsItem, randomDelay);
+    }, 5 * 60 * 1000); // Check every 5 minutes
+
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(recurringTimer);
+    };
+  }, []);
 
   // Mock data for metrics with descriptions
   const [snapshot, setSnapshot] = useState<MarketSnapshot>({
