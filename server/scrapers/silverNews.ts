@@ -258,25 +258,46 @@ export async function getSilverNews(limit: number = 10): Promise<SilverNewsItem[
 
   } catch (error) {
     console.error('[News] Error getting silver news:', error);
-    console.warn('[News] ⚠️  All methods failed, returning empty array');
-    return [];
+    console.warn('[News] ⚠️  Scraping failed, will use cached or fallback data');
+    throw error; // Let the cache handler deal with it
   }
 }
 
-// Cache
+// Cache with persistent fallback
 let cachedNews: SilverNewsItem[] | null = null;
 let lastFetch: number = 0;
 const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
+const STALE_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours - use stale cache if fresh fetch fails
 
 export async function getCachedSilverNews(limit: number = 10): Promise<SilverNewsItem[]> {
   const now = Date.now();
 
+  // Return fresh cache if available
   if (cachedNews && cachedNews.length > 0 && (now - lastFetch) < CACHE_DURATION) {
-    console.log('[News] Returning cached news');
+    console.log('[News] ✅ Returning fresh cached news');
     return cachedNews.map(item => ({ ...item, dataSource: 'cached' as const }));
   }
 
-  cachedNews = await getSilverNews(limit);
-  lastFetch = now;
-  return cachedNews;
+  // Try to fetch fresh news
+  try {
+    const freshNews = await getSilverNews(limit);
+    if (freshNews && freshNews.length > 0) {
+      cachedNews = freshNews;
+      lastFetch = now;
+      console.log(`[News] ✅ Fetched and cached ${freshNews.length} fresh news items`);
+      return cachedNews;
+    }
+  } catch (error) {
+    console.error('[News] Failed to fetch fresh news:', error);
+  }
+
+  // If fetch failed but we have stale cache, use it
+  if (cachedNews && cachedNews.length > 0 && (now - lastFetch) < STALE_CACHE_DURATION) {
+    console.warn('[News] ⚠️  Using stale cached news (fetch failed)');
+    return cachedNews.map(item => ({ ...item, dataSource: 'cached' as const }));
+  }
+
+  // Last resort: return empty and let it try again next time
+  console.error('[News] ❌ No news available - cache empty and fetch failed');
+  return [];
 }
