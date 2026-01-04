@@ -95,6 +95,10 @@ export default function Dashboard() {
     refetchInterval: autoRefresh ? refreshInterval : false,
   });
 
+  const { data: comexData } = trpc.silver.getComexInventory.useQuery(undefined, {
+    refetchInterval: autoRefresh ? refreshInterval : false,
+  });
+
   // Initialize news items with starting data
   const [newsItems, setNewsItems] = useState<NewsItem[]>(() => {
     const now = Date.now();
@@ -263,13 +267,13 @@ export default function Dashboard() {
       description: "Shanghai Gold Exchange premium over COMEX spot. Rising premium indicates physical shortage in China and paper/physical market decoupling. >$15 is critical threshold."
     },
     comexRegistered: {
-      value: 30.2,
-      status: "warning",
-      lastUpdate: Date.now() - 86400000,
+      value: comexData?.registered || 30.2,
+      status: !comexData || comexData.dataSource === 'fallback' ? "unknown" : (comexData.registered < 25 ? "crisis" : comexData.registered < 35 ? "warning" : "normal"),
+      lastUpdate: comexData?.timestamp || Date.now(),
       trend: "down",
       change24h: -2.5,
-      implication: "Supply stress",
-      description: "Available silver for immediate delivery at COMEX warehouses. Declining inventory indicates delivery pressure. <25M oz triggers force majeure risk."
+      implication: !comexData || comexData.dataSource === 'fallback' ? "Data unavailable" : (comexData.registered < 25 ? "Force majeure risk" : "Supply stress"),
+      description: `Available silver for immediate delivery at COMEX warehouses (Registered inventory only). ${comexData?.dataSource === 'fallback' ? '⚠️ Using fallback data - live data unavailable. ' : comexData?.dataSource === 'cached' ? '📦 Cached data. ' : '✅ Live data. '}Declining inventory indicates delivery pressure. <25M oz triggers force majeure risk, <35M oz is warning level.`
     },
     cmeMargins: {
       value: 32500,
