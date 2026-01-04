@@ -564,7 +564,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background text-foreground">
       <div className="flex h-screen">
         {/* Main Content */}
-        <div className="flex-1 overflow-auto p-4">
+        <div className="flex-[2] overflow-auto p-4">
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -760,7 +760,7 @@ export default function Dashboard() {
         </div>
 
         {/* News Sidebar */}
-        <div className="w-[768px] border-l border-border bg-card">
+        <div className="flex-1 border-l border-border bg-card">
           <div className="p-4 border-b border-border">
             <div className="flex items-center gap-2 mb-1">
               <Newspaper className="w-5 h-5" />
