@@ -105,10 +105,14 @@ export default function Dashboard() {
     { refetchInterval: 15 * 60 * 1000 } // Refresh every 15 minutes
   );
 
-  // Use real news from API, fallback to empty array
+  // Use real news from API with proper fallback
   const newsItems = useMemo(() => {
-    if (!realNews || realNews.length === 0) return [];
+    if (!realNews || realNews.length === 0) {
+      console.log('[Dashboard] No news from API, showing loading state');
+      return [];
+    }
     
+    console.log(`[Dashboard] Displaying ${realNews.length} news items from API`);
     return realNews.map(item => ({
       id: item.id,
       title: item.title,
@@ -768,7 +772,14 @@ export default function Dashboard() {
           
           <ScrollArea className="h-[calc(100vh-80px)]">
             <div className="p-4 space-y-3">
-              {newsItems.map((news) => (
+              {newsItems.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Newspaper className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p>Loading news...</p>
+                  <p className="text-xs mt-1">AI-analyzing recent silver market articles</p>
+                </div>
+              ) : (
+                newsItems.map((news) => (
                 <Card 
                   key={news.id} 
                   className="p-3 hover:bg-accent/50 transition-colors cursor-pointer"
@@ -810,7 +821,8 @@ export default function Dashboard() {
                     </div>
                   </div>
                 </Card>
-              ))}
+              )))
+              )}
             </div>
           </ScrollArea>
         </div>
