@@ -37,7 +37,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
-import { getRandomNewsTemplate } from "@/data/newsTemplates";
+// import { getRandomNewsTemplate } from "@/data/newsTemplates"; // No longer needed - using real news
 
 interface MetricData {
   value: number;
@@ -99,8 +99,34 @@ export default function Dashboard() {
     refetchInterval: autoRefresh ? refreshInterval : false,
   });
 
-  // Initialize news items with starting data
-  const [newsItems, setNewsItems] = useState<NewsItem[]>(() => {
+  // Fetch real silver news with AI analysis
+  const { data: realNews } = trpc.silver.getSilverNews.useQuery(
+    { limit: 15 },
+    { refetchInterval: 15 * 60 * 1000 } // Refresh every 15 minutes
+  );
+
+  // Use real news from API, fallback to empty array
+  const newsItems = useMemo(() => {
+    if (!realNews || realNews.length === 0) return [];
+    
+    return realNews.map(item => ({
+      id: item.id,
+      title: item.title,
+      summary: item.summary,
+      confidence: item.confidence,
+      timestamp: new Date(item.publishedAt).getTime(),
+      source: item.source,
+      sourceUrl: item.sourceUrl,
+      impact: item.impact
+    }));
+  }, [realNews]);
+
+  // OLD mock news data removed - now using real AI-analyzed news
+  // currentTime state already declared above
+
+  // OLD CODE BELOW (to be removed):
+  /*
+  const [oldNewsItems, setOldNewsItems] = useState<NewsItem[]>(() => {
     const now = Date.now();
     return [
     {
@@ -200,6 +226,7 @@ export default function Dashboard() {
     }
   ];
   });
+  */
 
   // Update current time every minute to refresh timestamps
   useEffect(() => {
@@ -209,42 +236,8 @@ export default function Dashboard() {
     return () => clearInterval(timer);
   }, []);
 
-  // Add new news items periodically (every 2-5 minutes)
-  useEffect(() => {
-    const addNewsItem = () => {
-      const template = getRandomNewsTemplate();
-      const newItem: NewsItem = {
-        id: `news-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        title: template.title,
-        summary: template.summary,
-        confidence: template.confidence,
-        timestamp: Date.now(),
-        source: template.source,
-        sourceUrl: template.sourceUrl,
-        impact: template.impact
-      };
-      
-      setNewsItems(prev => [newItem, ...prev]); // Add to top
-      
-      // Optional: Show a subtle notification
-      // toast.info("New market update", { duration: 2000 });
-    };
-
-    // Add first new item after 2 minutes
-    const initialDelay = 2 * 60 * 1000;
-    const initialTimer = setTimeout(addNewsItem, initialDelay);
-
-    // Then add new items every 3-5 minutes (random interval)
-    const recurringTimer = setInterval(() => {
-      const randomDelay = (3 + Math.random() * 2) * 60 * 1000; // 3-5 minutes
-      setTimeout(addNewsItem, randomDelay);
-    }, 5 * 60 * 1000); // Check every 5 minutes
-
-    return () => {
-      clearTimeout(initialTimer);
-      clearInterval(recurringTimer);
-    };
-  }, []);
+  // Real news is now fetched from API with AI analysis
+  // No need for simulated news generation
 
   // Mock data for metrics with descriptions
   const [snapshot, setSnapshot] = useState<MarketSnapshot>({

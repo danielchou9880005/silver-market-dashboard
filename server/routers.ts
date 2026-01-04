@@ -6,6 +6,7 @@ import { callDataApi } from "./_core/dataApi";
 import { z } from "zod";
 import { getSilverPrice } from "./scrapers/silverPrice";
 import { getComexInventory } from "./scrapers/comexInventory";
+import { getCachedSilverNews } from "./scrapers/silverNews";
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -114,6 +115,19 @@ export const appRouter = router({
         } catch (error) {
           console.error("Error fetching historical prices:", error);
           throw error;
+        }
+      }),
+
+    // Get silver news with AI analysis
+    getSilverNews: publicProcedure
+      .input(z.object({ limit: z.number().default(10) }).optional())
+      .query(async ({ input }) => {
+        try {
+          const news = await getCachedSilverNews(input?.limit || 10);
+          return news;
+        } catch (error) {
+          console.error("Error fetching silver news:", error);
+          return [];
         }
       }),
 
