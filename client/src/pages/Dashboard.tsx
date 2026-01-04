@@ -73,6 +73,7 @@ export default function Dashboard() {
   const [refreshInterval, setRefreshInterval] = useState(60000); // 1 minute default
   const [nextRefresh, setNextRefresh] = useState(refreshInterval / 1000);
   const [openPopovers, setOpenPopovers] = useState<Record<string, boolean>>({});
+  const [currentTime, setCurrentTime] = useState(Date.now());
   
   const togglePopover = useCallback((id: string, open: boolean) => {
     setOpenPopovers(prev => ({ ...prev, [id]: open }));
@@ -92,14 +93,24 @@ export default function Dashboard() {
     refetchInterval: autoRefresh ? refreshInterval : false,
   });
 
-  // Mock news data
-  const [newsItems] = useState<NewsItem[]>([
+  // Update current time every minute to refresh timestamps
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 60000); // Update every minute
+    return () => clearInterval(timer);
+  }, []);
+
+  // Mock news data with dynamic timestamps
+  const newsItems = useMemo<NewsItem[]>(() => {
+    const baseTime = currentTime;
+    return [
     {
       id: "1",
       title: "China Export Restrictions Take Effect",
       summary: "China officially implements silver export restrictions starting January 1, 2026. Government confirms policy.",
       confidence: "high",
-      timestamp: Date.now() - 3600000,
+      timestamp: baseTime - 3600000,
       source: "Chinese Ministry of Commerce",
       impact: "bullish"
     },
@@ -108,7 +119,7 @@ export default function Dashboard() {
       title: "Shanghai Premium Hits Record $12",
       summary: "Shanghai Gold Exchange silver premium over COMEX reaches unprecedented $12/oz, indicating severe decoupling.",
       confidence: "high",
-      timestamp: Date.now() - 7200000,
+      timestamp: baseTime - 7200000,
       source: "SGE Official Data",
       impact: "bullish"
     },
@@ -117,7 +128,7 @@ export default function Dashboard() {
       title: "CME Raises Margins 62.5% in 4 Days",
       summary: "Chicago Mercantile Exchange implements emergency margin hikes totaling 62.5% increase over 4-day period.",
       confidence: "high",
-      timestamp: Date.now() - 10800000,
+      timestamp: baseTime - 10800000,
       source: "CME Group",
       impact: "bullish"
     },
@@ -126,7 +137,7 @@ export default function Dashboard() {
       title: "Tesla Reportedly Stockpiling Silver",
       summary: "Unconfirmed reports suggest Tesla is building 6-month silver inventory ahead of solid-state battery production.",
       confidence: "medium",
-      timestamp: Date.now() - 14400000,
+      timestamp: baseTime - 14400000,
       source: "Industry Sources",
       impact: "bullish"
     },
@@ -135,7 +146,7 @@ export default function Dashboard() {
       title: "COMEX Registered Inventory Drops Below 30M oz",
       summary: "Available silver for delivery at COMEX warehouses falls to critical 30.2M oz level.",
       confidence: "high",
-      timestamp: Date.now() - 18000000,
+      timestamp: baseTime - 18000000,
       source: "COMEX Warehouse Data",
       impact: "bullish"
     },
@@ -144,7 +155,7 @@ export default function Dashboard() {
       title: "Retail Premiums Surge to $8-12 Over Spot",
       summary: "Major dealers (APMEX, JM Bullion) report premiums 3-4x normal levels as retail demand surges.",
       confidence: "high",
-      timestamp: Date.now() - 21600000,
+      timestamp: baseTime - 21600000,
       source: "Dealer Websites",
       impact: "bullish"
     },
@@ -153,7 +164,7 @@ export default function Dashboard() {
       title: "Rumors of COMEX Force Majeure Preparation",
       summary: "Unverified claims that COMEX is preparing contingency plans for potential delivery defaults.",
       confidence: "low",
-      timestamp: Date.now() - 25200000,
+      timestamp: baseTime - 25200000,
       source: "Anonymous Traders",
       impact: "bullish"
     },
@@ -162,7 +173,7 @@ export default function Dashboard() {
       title: "Samsung Increases Silver Purchasing",
       summary: "Reports indicate Samsung Electronics has increased silver procurement by 40% for Q1 2026.",
       confidence: "medium",
-      timestamp: Date.now() - 28800000,
+      timestamp: baseTime - 28800000,
       source: "Supply Chain Reports",
       impact: "bullish"
     },
@@ -171,7 +182,7 @@ export default function Dashboard() {
       title: "Indian Import Duties Under Review",
       summary: "Indian government considering reduction of silver import duties to ease domestic supply constraints.",
       confidence: "medium",
-      timestamp: Date.now() - 32400000,
+      timestamp: baseTime - 32400000,
       source: "Economic Times India",
       impact: "bearish"
     },
@@ -180,11 +191,12 @@ export default function Dashboard() {
       title: "New Mexican Mine Production Delayed",
       summary: "Major silver mine in Mexico reports 6-month delay in production ramp-up due to equipment issues.",
       confidence: "high",
-      timestamp: Date.now() - 36000000,
+      timestamp: baseTime - 36000000,
       source: "Mining Company Press Release",
       impact: "bullish"
     }
-  ]);
+  ];
+  }, [currentTime]);
 
   // Mock data for metrics with descriptions
   const [snapshot, setSnapshot] = useState<MarketSnapshot>({
@@ -704,7 +716,7 @@ export default function Dashboard() {
         </div>
 
         {/* News Sidebar */}
-        <div className="w-80 border-l border-border bg-card">
+        <div className="w-64 border-l border-border bg-card">
           <div className="p-4 border-b border-border">
             <div className="flex items-center gap-2 mb-1">
               <Newspaper className="w-5 h-5" />
