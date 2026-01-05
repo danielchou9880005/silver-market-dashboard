@@ -33,7 +33,7 @@ export const appRouter = router({
         const priceData = await getSilverPrice();
         
         return {
-          price: priceData.bid,
+          price: priceData.price,
           change: priceData.change,
           changePercent: priceData.changePercent,
           timestamp: Date.now(),
