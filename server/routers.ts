@@ -7,6 +7,10 @@ import { z } from "zod";
 import { getSilverPrice } from "./scrapers/silverPrice";
 import { getComexInventory } from "./scrapers/comexInventory";
 import { getCachedSilverNews } from "./scrapers/silverNews";
+import { getShanghaiPrice } from "./scrapers/shanghaiPrice";
+import { getETFPrices } from "./scrapers/etfPrices";
+import { getCMEMargins } from "./scrapers/cmeMargins";
+import { calculateDeliveryStressIndex } from "./scrapers/deliveryStressIndex";
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -130,6 +134,124 @@ export const appRouter = router({
           return [];
         }
       }),
+
+    // Get Shanghai price and premium
+    getShanghaiPrice: publicProcedure.query(async () => {
+      try {
+        const spotData = await getSilverPrice();
+        const shanghai = await getShanghaiPrice(spotData.bid);
+        return {
+          priceUSD: shanghai.priceUSD,
+          premium: shanghai.premium,
+          dataSource: shanghai.dataSource,
+          error: shanghai.error,
+          timestamp: shanghai.timestamp.getTime(),
+        };
+      } catch (error) {
+        console.error("Error fetching Shanghai price:", error);
+        return {
+          priceUSD: 76.50,
+          premium: 0.50,
+          dataSource: 'fallback' as const,
+          error: 'Failed to fetch Shanghai price',
+          timestamp: Date.now(),
+        };
+      }
+    }),
+
+    // Get ETF prices (SLV/SIVR)
+    getETFPrices: publicProcedure.query(async () => {
+      try {
+        const etfData = await getETFPrices();
+        return {
+          slvPrice: etfData.slvPrice,
+          sivrPrice: etfData.sivrPrice,
+          slvChange: etfData.slvChange,
+          sivrChange: etfData.sivrChange,
+          divergence: etfData.divergence,
+          dataSource: etfData.dataSource,
+          error: etfData.error,
+          timestamp: etfData.timestamp.getTime(),
+        };
+      } catch (error) {
+        console.error("Error fetching ETF prices:", error);
+        return {
+          slvPrice: 22.50,
+          sivrPrice: 22.45,
+          slvChange: 0.15,
+          sivrChange: 0.14,
+          divergence: 0.22,
+          dataSource: 'fallback' as const,
+          error: 'Failed to fetch ETF prices',
+          timestamp: Date.now(),
+        };
+      }
+    }),
+
+    // Get CME margin requirements
+    getCMEMargins: publicProcedure.query(async () => {
+      try {
+        const margins = await getCMEMargins();
+        return {
+          initialMargin: margins.initialMargin,
+          maintenanceMargin: margins.maintenanceMargin,
+          marginPerOz: margins.marginPerOz,
+          changePercent: margins.changePercent,
+          dataSource: margins.dataSource,
+          error: margins.error,
+          timestamp: margins.timestamp.getTime(),
+        };
+      } catch (error) {
+        console.error("Error fetching CME margins:", error);
+        return {
+          initialMargin: 16250,
+          maintenanceMargin: 14750,
+          marginPerOz: 3.25,
+          changePercent: 62.5,
+          dataSource: 'fallback' as const,
+          error: 'Failed to fetch margin data',
+          timestamp: Date.now(),
+        };
+      }
+    }),
+
+    // Get delivery stress index
+    getDeliveryStressIndex: publicProcedure.query(async () => {
+      try {
+        const inventory = await getComexInventory();
+        const spotData = await getSilverPrice();
+        const shanghai = await getShanghaiPrice(spotData.bid);
+        const margins = await getCMEMargins();
+        
+        const stressIndex = calculateDeliveryStressIndex({
+          registeredInventory: inventory.registered,
+          shanghaiPremium: shanghai.premium,
+          marginChangePercent: margins.changePercent,
+        });
+        
+        return {
+          index: stressIndex.index,
+          level: stressIndex.level,
+          factors: stressIndex.factors,
+          interpretation: stressIndex.interpretation,
+          timestamp: stressIndex.timestamp.getTime(),
+        };
+      } catch (error) {
+        console.error("Error calculating delivery stress index:", error);
+        return {
+          index: 85,
+          level: 'CRITICAL' as const,
+          factors: {
+            inventoryScore: 30,
+            coverageScore: 35,
+            premiumScore: 15,
+            marginScore: 5,
+          },
+          interpretation: 'Unable to calculate stress index',
+          timestamp: Date.now(),
+        };
+      }
+    }),
 
     // Compare SLV vs SIVR
     compareSLVvsSIVR: publicProcedure.query(async () => {
