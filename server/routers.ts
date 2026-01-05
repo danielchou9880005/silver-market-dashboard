@@ -253,6 +253,24 @@ export const appRouter = router({
       }
     }),
 
+    // Get silver news with AI analysis
+    getSilverNews: publicProcedure.query(async () => {
+      try {
+        const news = await getCachedSilverNews(10);
+        return {
+          news,
+          timestamp: Date.now(),
+        };
+      } catch (error) {
+        console.error("Error fetching silver news:", error);
+        return {
+          news: [],
+          timestamp: Date.now(),
+          error: 'Failed to fetch news',
+        };
+      }
+    }),
+
     // Compare SLV vs SIVR
     compareSLVvsSIVR: publicProcedure.query(async () => {
       try {
