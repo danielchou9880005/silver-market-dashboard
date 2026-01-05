@@ -3,6 +3,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { callDataApi } from "./_core/dataApi";
+import { getYahooFinanceChart } from "./utils/yahooFinance";
 import { z } from "zod";
 import { getSilverPrice } from "./scrapers/silverPrice";
 import { getComexInventory } from "./scrapers/comexInventory";
@@ -93,27 +94,12 @@ export const appRouter = router({
       .input(z.object({ range: z.string().default("1mo") }))
       .query(async ({ input }) => {
         try {
-          const response = await callDataApi("YahooFinance/get_stock_chart", {
-            query: {
-              symbol: "SI=F",
-              region: "US",
-              interval: "1d",
-              range: input.range,
-            },
-          });
-
-          const result = (response as any).chart?.result?.[0];
-          if (!result) throw new Error("No data returned");
-
-          const timestamps = result.timestamp || [];
-          const quotes = result.indicators?.quote?.[0];
+          const yahooData = await getYahooFinanceChart("SI=F", input.range, "1d");
           
-          if (!quotes) throw new Error("No quote data");
-
-          const data = timestamps.map((ts: number, i: number) => ({
-            date: new Date(ts * 1000).toISOString().split('T')[0],
-            price: quotes.close[i] || 0,
-          })).filter((d: any) => d.price > 0);
+          const data = yahooData.historicalPrices.map(p => ({
+            date: new Date(p.timestamp).toISOString().split('T')[0],
+            price: p.price,
+          }));
 
           return data;
         } catch (error) {
