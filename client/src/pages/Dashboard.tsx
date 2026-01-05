@@ -356,36 +356,6 @@ export default function Dashboard() {
     }));
   }, [priceData]);
 
-  // Update spot price when data changes
-  useEffect(() => {
-    if (spotData) {
-      setSnapshot(prev => ({
-        ...prev,
-        spotPrice: {
-          ...prev.spotPrice,
-          value: spotData.price,
-          lastUpdate: spotData.timestamp,
-          trend: spotData.change > 0 ? "up" : spotData.change < 0 ? "down" : "stable",
-          change24h: (spotData.change / spotData.price) * 100,
-        },
-      }));
-    }
-  }, [spotData]);
-
-  // Update SLV/SIVR divergence
-  useEffect(() => {
-    if (slvSivrData) {
-      setSnapshot(prev => ({
-        ...prev,
-        slvSivrDivergence: {
-          ...prev.slvSivrDivergence,
-          value: slvSivrData.divergencePercent,
-          lastUpdate: Date.now(),
-        },
-      }));
-    }
-  }, [slvSivrData]);
-
   // Countdown timer
   useEffect(() => {
     if (!autoRefresh) return;
