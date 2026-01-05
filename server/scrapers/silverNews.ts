@@ -1,18 +1,17 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import { OpenAI } from 'openai';
 
-// Only initialize OpenAI if API key is available
-let openai: OpenAI | null = null;
+// Gemini API configuration
+let geminiApiKey: string | null = null;
 try {
-  if (process.env.OPENAI_API_KEY) {
-    openai = new OpenAI();
-    console.log('[News AI] ✅ OpenAI initialized');
+  if (process.env.GEMINI_API_KEY) {
+    geminiApiKey = process.env.GEMINI_API_KEY;
+    console.log('[News AI] ✅ Gemini API key configured');
   } else {
-    console.log('[News AI] ⚠️  No OPENAI_API_KEY - AI analysis disabled');
+    console.log('[News AI] ⚠️  No GEMINI_API_KEY - AI analysis disabled');
   }
 } catch (error) {
-  console.error('[News AI] Failed to initialize OpenAI:', error);
+  console.error('[News AI] Failed to configure Gemini:', error);
 }
 
 export interface SilverNewsItem {
@@ -189,12 +188,12 @@ async function getNewsFromSearch(): Promise<SilverNewsItem[]> {
 }
 
 /**
- * Analyze news item with AI to determine confidence and impact
+ * Analyze news item with Gemini AI to determine confidence and impact
  */
 async function analyzeNewsWithAI(newsItem: SilverNewsItem): Promise<SilverNewsItem> {
-  // Skip AI analysis if OpenAI is not available
-  if (!openai) {
-    console.log('[News AI] ⚠️  Skipping AI analysis (OpenAI not initialized)');
+  // Skip AI analysis if Gemini API key is not available
+  if (!geminiApiKey) {
+    console.log('[News AI] ⚠️  Skipping AI analysis (Gemini not configured)');
     return newsItem;
   }
 
@@ -213,29 +212,38 @@ Provide:
 Respond ONLY with valid JSON in this exact format:
 {"confidence": "high", "impact": "bullish", "analysis": "explanation here"}`;
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a financial analyst specializing in precious metals. Analyze news credibility and market impact objectively. Respond only with valid JSON.'
-        },
-        {
-          role: 'user',
-          content: prompt
+    const response = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
+      {
+        contents: [{
+          parts: [{
+            text: `You are a financial analyst specializing in precious metals. Analyze news credibility and market impact objectively. Respond only with valid JSON.\n\n${prompt}`
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 150,
         }
-      ],
-      temperature: 0.3,
-      max_tokens: 150
-    });
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        timeout: 10000
+      }
+    );
 
-    const result = completion.choices[0]?.message?.content?.trim();
+    const result = response.data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
     if (result) {
-      const analysis = JSON.parse(result);
-      newsItem.confidence = analysis.confidence;
-      newsItem.impact = analysis.impact;
-      newsItem.aiAnalysis = analysis.analysis;
-      console.log(`[News AI] ✅ ${newsItem.title.substring(0, 40)}... -> ${analysis.confidence}/${analysis.impact}`);
+      // Extract JSON from response (Gemini might wrap it in markdown)
+      const jsonMatch = result.match(/\{[^}]+\}/);
+      if (jsonMatch) {
+        const analysis = JSON.parse(jsonMatch[0]);
+        newsItem.confidence = analysis.confidence;
+        newsItem.impact = analysis.impact;
+        newsItem.aiAnalysis = analysis.analysis;
+        console.log(`[News AI] ✅ ${newsItem.title.substring(0, 40)}... -> ${analysis.confidence}/${analysis.impact}`);
+      }
     }
 
   } catch (error) {
