@@ -87,7 +87,7 @@ export default function Dashboard() {
   });
 
   const { data: historicalData } = trpc.silver.getHistoricalPrices.useQuery(
-    { range: "1mo" },
+    { range: "3mo" },
     { refetchInterval: autoRefresh ? refreshInterval : false }
   );
 
