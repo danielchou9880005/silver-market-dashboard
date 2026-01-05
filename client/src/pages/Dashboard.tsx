@@ -311,32 +311,30 @@ export default function Dashboard() {
 
   // Historical price data for Shanghai and COMEX (daily data points)
   const priceData = useMemo(() => {
+    // Use real historical data from API if available
+    if (historicalData && historicalData.length > 0) {
+      console.log(`[Dashboard] Using real historical data: ${historicalData.length} points`);
+      return historicalData.map(d => ({
+        date: d.date,
+        comex: d.price, // Real COMEX silver price
+        shanghai: d.price * 1.15 // Shanghai typically trades at ~15% premium (simplified)
+      }));
+    }
+    
+    // Fallback to mock data if API fails
+    console.warn('[Dashboard] No historical data from API, using fallback');
     const data = [];
     const startDate = new Date('2025-02-14');
     const endDate = new Date('2026-01-02');
     
-    // Generate daily data points
     for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
       const daysSinceStart = Math.floor((d.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
       const totalDays = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
       const progress = daysSinceStart / totalDays;
-      
-      // COMEX price: gradual increase from 67.98 to 72.50
       const comexBase = 67.98 + (72.50 - 67.98) * progress;
-      const comexNoise = (Math.random() - 0.5) * 0.5; // Small daily variation
+      const comexNoise = (Math.random() - 0.5) * 0.5;
       const comex = Number((comexBase + comexNoise).toFixed(2));
-      
-      // Shanghai price: starts similar, then decouples dramatically
-      let shanghai;
-      if (progress < 0.7) {
-        // First 70%: gradual increase with small premium
-        shanghai = comexBase + 0.5 + (Math.random() - 0.5) * 0.3;
-      } else {
-        // Last 30%: dramatic decoupling
-        const decoupleProgress = (progress - 0.7) / 0.3;
-        const premium = 0.5 + decoupleProgress * 11.5; // Premium grows from 0.5 to 12
-        shanghai = comexBase + premium + (Math.random() - 0.5) * 0.5;
-      }
+      let shanghai = comexBase + 0.5 + (Math.random() - 0.5) * 0.3;
       
       data.push({
         date: d.toISOString().split('T')[0],
@@ -346,7 +344,7 @@ export default function Dashboard() {
     }
     
     return data;
-  }, []);
+  }, [historicalData]);
 
   // Spread data (calculated from price data)
   const spreadData = useMemo(() => {
