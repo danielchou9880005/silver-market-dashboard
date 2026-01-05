@@ -2,7 +2,18 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { OpenAI } from 'openai';
 
-const openai = new OpenAI();
+// Only initialize OpenAI if API key is available
+let openai: OpenAI | null = null;
+try {
+  if (process.env.OPENAI_API_KEY) {
+    openai = new OpenAI();
+    console.log('[News AI] ✅ OpenAI initialized');
+  } else {
+    console.log('[News AI] ⚠️  No OPENAI_API_KEY - AI analysis disabled');
+  }
+} catch (error) {
+  console.error('[News AI] Failed to initialize OpenAI:', error);
+}
 
 export interface SilverNewsItem {
   id: string;
@@ -181,6 +192,12 @@ async function getNewsFromSearch(): Promise<SilverNewsItem[]> {
  * Analyze news item with AI to determine confidence and impact
  */
 async function analyzeNewsWithAI(newsItem: SilverNewsItem): Promise<SilverNewsItem> {
+  // Skip AI analysis if OpenAI is not available
+  if (!openai) {
+    console.log('[News AI] ⚠️  Skipping AI analysis (OpenAI not initialized)');
+    return newsItem;
+  }
+
   try {
     const prompt = `Analyze this silver market news article:
 
