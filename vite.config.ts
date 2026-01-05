@@ -24,6 +24,14 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    minify: 'esbuild', // Faster than terser
+    sourcemap: false, // Disable sourcemaps in production
+    rollupOptions: {
+      output: {
+        manualChunks: undefined, // Disable manual chunking to speed up build
+      },
+    },
+    chunkSizeWarningLimit: 2000, // Increase limit to avoid warnings
   },
   server: {
     host: true,
