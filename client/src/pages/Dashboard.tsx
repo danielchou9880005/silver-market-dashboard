@@ -309,31 +309,52 @@ export default function Dashboard() {
     },
   }), [spotData, comexData]); // Update when real data changes
 
-  // Historical price data for Shanghai and COMEX
-  const [priceData] = useState([
-    { date: "2025-02-15", shanghai: 68.50, comex: 67.98 },
-    { date: "2025-03-15", shanghai: 69.20, comex: 68.52 },
-    { date: "2025-05-15", shanghai: 70.10, comex: 69.65 },
-    { date: "2025-08-15", shanghai: 71.50, comex: 70.68 },
-    { date: "2025-11-01", shanghai: 72.80, comex: 71.55 },
-    { date: "2025-12-01", shanghai: 75.20, comex: 71.70 },
-    { date: "2025-12-20", shanghai: 80.00, comex: 72.00 },
-    { date: "2026-01-01", shanghai: 84.40, comex: 72.40 },
-    { date: "2026-01-03", shanghai: 84.06, comex: 72.50 },
-  ]);
+  // Historical price data for Shanghai and COMEX (daily data points)
+  const priceData = useMemo(() => {
+    const data = [];
+    const startDate = new Date('2025-02-14');
+    const endDate = new Date('2026-01-02');
+    
+    // Generate daily data points
+    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+      const daysSinceStart = Math.floor((d.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      const totalDays = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      const progress = daysSinceStart / totalDays;
+      
+      // COMEX price: gradual increase from 67.98 to 72.50
+      const comexBase = 67.98 + (72.50 - 67.98) * progress;
+      const comexNoise = (Math.random() - 0.5) * 0.5; // Small daily variation
+      const comex = Number((comexBase + comexNoise).toFixed(2));
+      
+      // Shanghai price: starts similar, then decouples dramatically
+      let shanghai;
+      if (progress < 0.7) {
+        // First 70%: gradual increase with small premium
+        shanghai = comexBase + 0.5 + (Math.random() - 0.5) * 0.3;
+      } else {
+        // Last 30%: dramatic decoupling
+        const decoupleProgress = (progress - 0.7) / 0.3;
+        const premium = 0.5 + decoupleProgress * 11.5; // Premium grows from 0.5 to 12
+        shanghai = comexBase + premium + (Math.random() - 0.5) * 0.5;
+      }
+      
+      data.push({
+        date: d.toISOString().split('T')[0],
+        shanghai: Number(shanghai.toFixed(2)),
+        comex: comex
+      });
+    }
+    
+    return data;
+  }, []);
 
-  // Spread data (separate chart)
-  const [spreadData] = useState([
-    { date: "2025-02-15", spread: 0.52 },
-    { date: "2025-03-15", spread: 0.68 },
-    { date: "2025-05-15", spread: 0.45 },
-    { date: "2025-08-15", spread: 0.82 },
-    { date: "2025-11-01", spread: 1.25 },
-    { date: "2025-12-01", spread: 3.50 },
-    { date: "2025-12-20", spread: 8.00 },
-    { date: "2026-01-01", spread: 12.00 },
-    { date: "2026-01-03", spread: 11.56 },
-  ]);
+  // Spread data (calculated from price data)
+  const spreadData = useMemo(() => {
+    return priceData.map(d => ({
+      date: d.date,
+      spread: Number((d.shanghai - d.comex).toFixed(2))
+    }));
+  }, [priceData]);
 
   // Update spot price when data changes
   useEffect(() => {
@@ -626,6 +647,8 @@ export default function Dashboard() {
                       const date = new Date(value);
                       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                     }}
+                    interval="preserveStartEnd"
+                    minTickGap={50}
                   />
                   <YAxis stroke="#666" tick={{ fontSize: 10 }} width={40} domain={['dataMin - 2', 'dataMax + 2']} />
                   <Tooltip 
@@ -669,6 +692,8 @@ export default function Dashboard() {
                       const date = new Date(value);
                       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                     }}
+                    interval="preserveStartEnd"
+                    minTickGap={50}
                   />
                   <YAxis stroke="#666" tick={{ fontSize: 10 }} width={40} />
                   <Tooltip 
