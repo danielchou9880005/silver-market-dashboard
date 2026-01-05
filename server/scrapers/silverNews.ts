@@ -272,13 +272,16 @@ export async function getSilverNews(limit: number = 10): Promise<SilverNewsItem[
       throw new Error('No news items available');
     }
 
+    // Sort by date (newest first)
+    newsItems.sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime());
+
     // Analyze each news item with AI (in parallel, limit to avoid rate limits)
     const itemsToAnalyze = newsItems.slice(0, Math.min(limit, 8));
     newsItems = await Promise.all(
       itemsToAnalyze.map(item => analyzeNewsWithAI(item))
     );
 
-    console.log(`[News] ✅ Returning ${newsItems.length} AI-analyzed news items`);
+    console.log(`[News] ✅ Returning ${newsItems.length} AI-analyzed news items (newest first)`);
     return newsItems;
 
   } catch (error) {
