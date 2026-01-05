@@ -242,19 +242,18 @@ export const appRouter = router({
     // Compare SLV vs SIVR
     compareSLVvsSIVR: publicProcedure.query(async () => {
       try {
-        const [slvResponse, sivrResponse] = await Promise.all([
-          callDataApi("YahooFinance/get_stock_chart", {
-            query: { symbol: "SLV", region: "US", interval: "1d", range: "1d" },
-          }),
-          callDataApi("YahooFinance/get_stock_chart", {
-            query: { symbol: "SIVR", region: "US", interval: "1d", range: "1d" },
-          }),
+        // Use direct Yahoo Finance API calls
+        const [slvData, sivrData] = await Promise.all([
+          getYahooFinanceChart("SLV", "1d", "1d"),
+          getYahooFinanceChart("SIVR", "1d", "1d"),
         ]);
 
-        const slvPrice = (slvResponse as any).chart?.result?.[0]?.meta?.regularMarketPrice || 0;
-        const sivrPrice = (sivrResponse as any).chart?.result?.[0]?.meta?.regularMarketPrice || 0;
+        const slvPrice = slvData.currentPrice;
+        const sivrPrice = sivrData.currentPrice;
         const divergence = Math.abs(slvPrice - sivrPrice);
         const divergencePercent = (divergence / slvPrice) * 100;
+
+        console.log(`[SLV/SIVR] SLV: $${slvPrice}, SIVR: $${sivrPrice}, Divergence: ${divergencePercent.toFixed(2)}%`);
 
         return {
           slvPrice,
