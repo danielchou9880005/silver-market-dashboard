@@ -243,16 +243,16 @@ export default function Dashboard() {
   // Real news is now fetched from API with AI analysis
   // No need for simulated news generation
 
-  // Mock data for metrics with descriptions
-  const [snapshot, setSnapshot] = useState<MarketSnapshot>({
+  // Real data for metrics - updates when API data changes
+  const snapshot = useMemo((): MarketSnapshot => ({
     spotPrice: {
       value: spotData?.price || 72.50,
       status: "normal",
-      lastUpdate: Date.now(),
-      trend: "down",
-      change24h: -1.2,
-      implication: "Hold position",
-      description: "COMEX spot silver price. Falling price can indicate margin hike suppression or industrial demand weakness. Current trend based on 24-hour change."
+      lastUpdate: spotData?.timestamp || Date.now(),
+      trend: (spotData?.change || 0) >= 0 ? "up" : "down",
+      change24h: spotData?.change || 0,
+      implication: (spotData?.change || 0) >= 0 ? "Bullish momentum" : "Bearish pressure",
+      description: `COMEX spot silver price. ${spotData?.dataSource === 'fallback' ? '⚠️ Using fallback data - live data unavailable. ' : spotData?.dataSource === 'cached' ? '📦 Cached data. ' : '✅ Live data. '}Current trend based on 24-hour change.`
     },
     shanghaiPremium: {
       value: 11.56,
@@ -308,7 +308,7 @@ export default function Dashboard() {
       implication: "Pressure building",
       description: "Composite index (0-100) measuring delivery pressure: notices vs inventory, Shanghai premium, margin hikes. >80 indicates imminent force majeure risk."
     },
-  });
+  }), [spotData, comexData]); // Update when real data changes
 
   // Historical price data for Shanghai and COMEX
   const [priceData] = useState([
