@@ -264,8 +264,7 @@ export default function Dashboard() {
       description: "Shanghai Gold Exchange premium over COMEX spot. Rising premium indicates physical shortage in China and paper/physical market decoupling. >$15 is critical threshold."
     },
     comexRegistered: {
-      value: comexData?.registered || 30.2,
-      status: !comexData || comexData.dataSource === 'fallback' ? "unknown" : (comexData.registered < 25 ? "crisis" : comexData.registered < 35 ? "warning" : "normal"),
+      value: comexData?.registered || 127.26,      status: !comexData || comexData.dataSource === 'fallback' ? "unknown" : (comexData.registered < 25 ? "crisis" : comexData.registered < 35 ? "warning" : "normal"),
       lastUpdate: comexData?.timestamp || Date.now(),
       trend: "down",
       change24h: -2.5,

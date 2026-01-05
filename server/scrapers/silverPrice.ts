@@ -2,107 +2,90 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 
 interface SilverPriceData {
+  price: number;
   bid: number;
   ask: number;
   change: number;
   changePercent: number;
   dayHigh: number;
   dayLow: number;
-  lastUpdate: Date;
+  timestamp: number;
   dataSource: 'live' | 'cached' | 'fallback';
   error?: string;
 }
 
 /**
- * Scrape silver spot price from Kitco
+ * Scrape real silver spot price from JM Bullion
  */
-export async function scrapeSilverPrice(): Promise<SilverPriceData> {
+async function scrapeJMBullion(): Promise<SilverPriceData | null> {
   try {
-    const url = 'https://www.kitco.com/charts/livesilver.html';
+    const url = 'https://www.jmbullion.com/charts/silver-prices/';
     
     const response = await axios.get(url, {
       timeout: 10000,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       }
     });
 
     const $ = cheerio.load(response.data);
+    
+    // Find the price in the text "the live Silver spot price for 1 ounce of Silver in U.S. dollars (USD) is $76.02"
+    const text = $('body').text();
+    const priceMatch = text.match(/live Silver spot price for 1 ounce of Silver in U\.S\. dollars \(USD\) is \$([0-9,.]+)/i);
+    
+    if (!priceMatch) {
+      console.error('[JMBullion] Could not find price in page');
+      return null;
+    }
 
-    // Extract bid price (main price displayed)
-    let bid = 0;
-    let ask = 0;
+    const price = parseFloat(priceMatch[1].replace(/,/g, ''));
+    
+    // Try to find change value from the table
     let change = 0;
-    let changePercent = 0;
-    let dayHigh = 0;
-    let dayLow = 0;
-
-    // Try to find the bid price - look for the large price display
-    const bidText = $('h3').first().text().trim();
-    bid = parseFloat(bidText.replace(/[^0-9.]/g, ''));
-
-    // Look for change value (usually in format "+1.23 (+1.72%)")
-    $('h3').each((i, elem) => {
-      const text = $(elem).text();
-      if (text.includes('+') || text.includes('-')) {
-        const matches = text.match(/([+-]?[\d.]+)\s*\(([+-]?[\d.]+)%\)/);
-        if (matches) {
-          change = parseFloat(matches[1]);
-          changePercent = parseFloat(matches[2]);
+    $('table tr').each((i, row) => {
+      const cells = $(row).find('td');
+      if (cells.length >= 2) {
+        const label = $(cells[0]).text().trim();
+        if (label.includes('Silver Price Per Ounce')) {
+          const changeText = $(cells[2]).text().trim();
+          const changeMatch = changeText.match(/([+-]?\$?[0-9.]+)/);
+          if (changeMatch) {
+            change = parseFloat(changeMatch[1].replace('$', ''));
+          }
         }
       }
     });
 
-    // Look for day's range
-    const rangeText = $('.range, [class*="range"]').text() || '';
-    const rangeMatch = rangeText.match(/([\d.]+)\s*([\d.]+)/);
-    if (rangeMatch) {
-      dayLow = parseFloat(rangeMatch[1]);
-      dayHigh = parseFloat(rangeMatch[2]);
+    if (price < 10 || price > 200) {
+      console.error(`[JMBullion] Invalid price: ${price}`);
+      return null;
     }
 
-    // Ask is typically bid + small spread
-    ask = bid + 0.12; // Typical spread for silver
-
-    // Validate we got reasonable data
-    if (!bid || bid < 10 || bid > 200) {
-      throw new Error(`Invalid bid price: ${bid}`);
-    }
-
-    console.log(`[Kitco] ✅ Scraped silver price - Bid: $${bid}, Change: ${change} (${changePercent}%)`);
+    console.log(`[JMBullion] ✅ Scraped price: $${price} (change: ${change >= 0 ? '+' : ''}${change})`);
 
     return {
-      bid,
-      ask,
+      price,
+      bid: price,
+      ask: price + 0.10, // Approximate spread
       change,
-      changePercent,
-      dayHigh: dayHigh || bid + 2,
-      dayLow: dayLow || bid - 2,
-      lastUpdate: new Date(),
+      changePercent: price > 0 ? (change / (price - change)) * 100 : 0,
+      dayHigh: price + Math.abs(change) * 0.5,
+      dayLow: price - Math.abs(change) * 0.5,
+      timestamp: Date.now(),
       dataSource: 'live'
     };
 
   } catch (error) {
-    console.error('[Kitco] Error scraping silver price:', error);
-    console.warn('[Kitco] ⚠️  Using fallback data - scraping failed');
-    
-    // Return fallback data with error indicator
-    return {
-      bid: 72.77,
-      ask: 72.89,
-      change: 1.23,
-      changePercent: 1.72,
-      dayHigh: 74.59,
-      dayLow: 71.23,
-      lastUpdate: new Date(),
-      dataSource: 'fallback',
-      error: error instanceof Error ? error.message : 'Failed to scrape price data'
-    };
+    console.error('[JMBullion] Scraping failed:', error);
+    return null;
   }
 }
 
-// Alternative scraper using a different source
-export async function scrapeSilverPriceFromApmex(): Promise<SilverPriceData> {
+/**
+ * Scrape silver price from APMEX as backup
+ */
+async function scrapeAPMEX(): Promise<SilverPriceData | null> {
   try {
     const url = 'https://www.apmex.com/silver-price';
     
@@ -114,74 +97,95 @@ export async function scrapeSilverPriceFromApmex(): Promise<SilverPriceData> {
     });
 
     const $ = cheerio.load(response.data);
-
-    // APMEX has spot price in specific elements
-    let bid = 0;
     
-    // Look for price elements
-    $('.spot-price, [data-price], .price-value').each((i, elem) => {
-      const text = $(elem).text().trim();
-      const price = parseFloat(text.replace(/[^0-9.]/g, ''));
-      if (price > 10 && price < 200) {
-        bid = price;
-        return false; // break
-      }
-    });
-
-    if (bid === 0) {
-      throw new Error('Could not find price on APMEX');
+    // Look for price in various possible locations
+    let price = 0;
+    
+    // Try meta tags first
+    const priceMetaContent = $('meta[property="og:price:amount"]').attr('content');
+    if (priceMetaContent) {
+      price = parseFloat(priceMetaContent);
+    }
+    
+    // Try structured data
+    if (!price) {
+      $('script[type="application/ld+json"]').each((i, elem) => {
+        try {
+          const json = JSON.parse($(elem).html() || '{}');
+          if (json.offers && json.offers.price) {
+            price = parseFloat(json.offers.price);
+          }
+        } catch (e) {
+          // Ignore JSON parse errors
+        }
+      });
     }
 
-    console.log(`[APMEX] Scraped silver price - Bid: $${bid}`);
+    if (price < 10 || price > 200) {
+      console.error(`[APMEX] Invalid price: ${price}`);
+      return null;
+    }
+
+    console.log(`[APMEX] ✅ Scraped price: $${price}`);
 
     return {
-      bid,
-      ask: bid + 0.12,
-      change: 0,
+      price,
+      bid: price,
+      ask: price + 0.10,
+      change: 0, // APMEX doesn't always show change
       changePercent: 0,
-      dayHigh: bid + 2,
-      dayLow: bid - 2,
-      lastUpdate: new Date(),
+      dayHigh: price,
+      dayLow: price,
+      timestamp: Date.now(),
       dataSource: 'live'
     };
 
   } catch (error) {
-    console.error('[APMEX] Error scraping silver price:', error);
-    throw error;
+    console.error('[APMEX] Scraping failed:', error);
+    return null;
   }
 }
 
 // Cache
 let cachedPrice: SilverPriceData | null = null;
-let lastFetch: number = 0;
+let lastFetch = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
+/**
+ * Get real silver spot price with caching and fallback
+ */
 export async function getSilverPrice(): Promise<SilverPriceData> {
   const now = Date.now();
-  
+
+  // Return fresh cache if available
   if (cachedPrice && (now - lastFetch) < CACHE_DURATION) {
-    console.log('[Silver Price] Returning cached data');
-    return {
-      ...cachedPrice,
-      dataSource: 'cached'
-    };
+    console.log('[SilverPrice] ✅ Returning cached price');
+    return { ...cachedPrice, dataSource: 'cached' };
   }
 
-  try {
-    // Try Kitco first
-    cachedPrice = await scrapeSilverPrice();
-  } catch (error) {
-    console.log('[Silver Price] Kitco failed, trying APMEX...');
-    try {
-      cachedPrice = await scrapeSilverPriceFromApmex();
-    } catch (error2) {
-      console.error('[Silver Price] All sources failed');
-      // Return last cached data or fallback
-      if (cachedPrice) return cachedPrice;
-      throw error2;
-    }
+  // Try JM Bullion first
+  let priceData = await scrapeJMBullion();
+  
+  // Try APMEX as backup
+  if (!priceData) {
+    console.warn('[SilverPrice] JM Bullion failed, trying APMEX...');
+    priceData = await scrapeAPMEX();
   }
 
-  lastFetch = now;
-  return cachedPrice;
+  // If we got real data, cache it
+  if (priceData) {
+    cachedPrice = priceData;
+    lastFetch = now;
+    return priceData;
+  }
+
+  // Use stale cache if available
+  if (cachedPrice) {
+    console.warn('[SilverPrice] ⚠️  All sources failed, using stale cache');
+    return { ...cachedPrice, dataSource: 'cached' };
+  }
+
+  // Last resort fallback - DO NOT USE unless absolutely necessary
+  console.error('[SilverPrice] ❌ All sources failed and no cache available');
+  throw new Error('Unable to fetch silver price from any source');
 }

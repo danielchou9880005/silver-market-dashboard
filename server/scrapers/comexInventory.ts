@@ -2,155 +2,151 @@ import axios from 'axios';
 import * as XLSX from 'xlsx';
 
 interface ComexInventoryData {
-  registered: number;
-  eligible: number;
-  total: number;
-  lastUpdate: Date;
+  registered: number; // Million oz
+  eligible: number; // Million oz
+  total: number; // Million oz
+  timestamp: number;
   dataSource: 'live' | 'cached' | 'fallback';
-  error?: string;
+  reportDate?: string;
 }
 
 /**
- * Scrape COMEX silver inventory data from CME Group
- * Returns only REGISTERED inventory (available for delivery)
+ * Scrape COMEX silver inventory from CME Group Excel file
  */
-export async function scrapeComexInventory(): Promise<ComexInventoryData> {
+async function scrapeComexInventory(): Promise<ComexInventoryData | null> {
   try {
     const url = 'https://www.cmegroup.com/delivery_reports/Silver_stocks.xls';
     
-    // Download the Excel file
+    console.log('[COMEX] Downloading Excel file...');
     const response = await axios.get(url, {
       responseType: 'arraybuffer',
-      timeout: 15000,
+      timeout: 30000,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
       }
     });
 
-    // Parse Excel file
+    console.log('[COMEX] Parsing Excel file...');
     const workbook = XLSX.read(response.data, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
     
-    // Convert to JSON with header row
-    const data = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' }) as any[][];
-
+    // Convert to JSON to make parsing easier
+    const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+    
     let totalRegistered = 0;
     let totalEligible = 0;
-    let foundData = false;
-
-    console.log('[COMEX] Parsing Excel file...');
-
-    // The structure is:
-    // DEPOSITORY NAME
-    // Registered    [prev] [received] [withdrawn] [net change] [adjustment] [TOTAL TODAY]
-    // Eligible      [prev] [received] [withdrawn] [net change] [adjustment] [TOTAL TODAY]
-    // Total         ...
+    let reportDate = '';
     
+    // Find report date
+    for (const row of data) {
+      const text = row.join(' ');
+      if (text.includes('Report Date:')) {
+        const match = text.match(/Report Date:\s*([0-9\/]+)/);
+        if (match) {
+          reportDate = match[1];
+        }
+      }
+    }
+    
+    // Parse inventory data
+    // Look for rows with "Registered" or "Eligible" in them
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
-      if (!row || row.length === 0) continue;
-
-      const firstCell = String(row[0] || '').trim();
+      if (!row || row.length < 2) continue;
       
-      // Look for "Registered" rows
-      if (firstCell.toLowerCase() === 'registered') {
-        // The last column (index 6) should have "TOTAL TODAY"
-        const totalToday = row[6];
-        if (totalToday) {
-          const value = parseFloat(String(totalToday).replace(/,/g, ''));
-          if (!isNaN(value) && value > 0) {
-            totalRegistered += value;
-            foundData = true;
-            console.log(`[COMEX] Found Registered: ${value.toLocaleString()} oz`);
+      const firstCol = String(row[0] || '').trim();
+      
+      // Check if this is a "Registered" row
+      if (firstCol === 'Registered') {
+        // The last column should be "TOTAL TODAY"
+        // Find the rightmost number that looks like an inventory value
+        for (let j = row.length - 1; j >= 0; j--) {
+          const val = row[j];
+          if (typeof val === 'number' && val > 100000) {
+            totalRegistered += val;
+            console.log(`[COMEX] Found Registered: ${val.toLocaleString()} oz`);
+            break;
           }
         }
       }
       
-      // Look for "Eligible" rows
-      if (firstCell.toLowerCase() === 'eligible') {
-        const totalToday = row[6];
-        if (totalToday) {
-          const value = parseFloat(String(totalToday).replace(/,/g, ''));
-          if (!isNaN(value) && value > 0) {
-            totalEligible += value;
-            console.log(`[COMEX] Found Eligible: ${value.toLocaleString()} oz`);
-          }
-        }
-      }
-
-      // Also look for grand total rows
-      if (firstCell.toLowerCase().includes('total') && firstCell.toLowerCase().includes('registered')) {
-        const totalValue = row[1] || row[6];
-        if (totalValue) {
-          const value = parseFloat(String(totalValue).replace(/,/g, ''));
-          if (!isNaN(value) && value > 1000000) { // Should be millions
-            totalRegistered = value;
-            foundData = true;
-            console.log(`[COMEX] Found Grand Total Registered: ${value.toLocaleString()} oz`);
+      // Check if this is an "Eligible" row
+      if (firstCol === 'Eligible') {
+        for (let j = row.length - 1; j >= 0; j--) {
+          const val = row[j];
+          if (typeof val === 'number' && val > 100000) {
+            totalEligible += val;
+            console.log(`[COMEX] Found Eligible: ${val.toLocaleString()} oz`);
+            break;
           }
         }
       }
     }
-
-    if (!foundData) {
-      throw new Error('Could not parse COMEX inventory data');
-    }
-
-    // Convert from troy ounces to millions of ounces
-    const registeredMoz = totalRegistered / 1_000_000;
-    const eligibleMoz = totalEligible / 1_000_000;
-    const totalMoz = registeredMoz + eligibleMoz;
-
-    console.log(`[COMEX] Total Registered: ${registeredMoz.toFixed(2)}M oz`);
-    console.log(`[COMEX] Total Eligible: ${eligibleMoz.toFixed(2)}M oz`);
-
-    // Sanity check - registered should be between 10M and 200M oz
-    if (registeredMoz < 10 || registeredMoz > 200) {
-      throw new Error(`Registered inventory ${registeredMoz}M oz is out of expected range`);
-    }
-
-    return {
-      registered: registeredMoz,
-      eligible: eligibleMoz,
-      total: totalMoz,
-      lastUpdate: new Date(),
-      dataSource: 'live'
-    };
-
-  } catch (error) {
-    console.error('[COMEX] Error scraping inventory:', error);
-    console.warn('[COMEX] ⚠️  Using fallback data - scraping failed');
     
-    // Return fallback data with error indicator
+    // Validate the data
+    if (totalRegistered < 1000000 || totalRegistered > 500000000) {
+      console.error(`[COMEX] Invalid registered inventory: ${totalRegistered}`);
+      return null;
+    }
+    
+    // Convert to millions
+    const registeredM = totalRegistered / 1000000;
+    const eligibleM = totalEligible / 1000000;
+    const totalM = registeredM + eligibleM;
+    
+    console.log(`[COMEX] ✅ Total Registered: ${registeredM.toFixed(2)}M oz`);
+    console.log(`[COMEX] ✅ Total Eligible: ${eligibleM.toFixed(2)}M oz`);
+    console.log(`[COMEX] ✅ Report Date: ${reportDate}`);
+    
     return {
-      registered: 30.2, // Last known value from market reports
-      eligible: 290.0,
-      total: 320.2,
-      lastUpdate: new Date(),
-      dataSource: 'fallback',
-      error: error instanceof Error ? error.message : 'Failed to scrape COMEX data'
+      registered: registeredM,
+      eligible: eligibleM,
+      total: totalM,
+      timestamp: Date.now(),
+      dataSource: 'live',
+      reportDate
     };
+    
+  } catch (error) {
+    console.error('[COMEX] Scraping failed:', error);
+    return null;
   }
 }
 
-// Cache to avoid hammering the server
-let cachedData: ComexInventoryData | null = null;
-let lastFetch: number = 0;
-const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+// Cache
+let cachedInventory: ComexInventoryData | null = null;
+let lastFetch = 0;
+const CACHE_DURATION = 60 * 60 * 1000; // 1 hour (inventory updates once per day)
 
+/**
+ * Get COMEX inventory with caching
+ */
 export async function getComexInventory(): Promise<ComexInventoryData> {
   const now = Date.now();
-  
-  if (cachedData && (now - lastFetch) < CACHE_DURATION) {
-    console.log('[COMEX] Returning cached data');
-    return {
-      ...cachedData,
-      dataSource: 'cached'
-    };
+
+  // Return fresh cache
+  if (cachedInventory && (now - lastFetch) < CACHE_DURATION) {
+    console.log('[COMEX] ✅ Returning cached inventory');
+    return { ...cachedInventory, dataSource: 'cached' };
   }
 
-  cachedData = await scrapeComexInventory();
-  lastFetch = now;
-  return cachedData;
+  // Try to fetch fresh data
+  const inventoryData = await scrapeComexInventory();
+  
+  if (inventoryData) {
+    cachedInventory = inventoryData;
+    lastFetch = now;
+    return inventoryData;
+  }
+
+  // Use stale cache if available
+  if (cachedInventory) {
+    console.warn('[COMEX] ⚠️  Scraping failed, using stale cache');
+    return { ...cachedInventory, dataSource: 'cached' };
+  }
+
+  // Last resort - throw error instead of using fake fallback data
+  console.error('[COMEX] ❌ No data available');
+  throw new Error('Unable to fetch COMEX inventory data');
 }
