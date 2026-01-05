@@ -198,19 +198,26 @@ async function analyzeNewsWithAI(newsItem: SilverNewsItem): Promise<SilverNewsIt
   }
 
   try {
-    const prompt = `Analyze this silver market news article:
+    const prompt = `Analyze this content about silver:
 
 Title: ${newsItem.title}
 Summary: ${newsItem.summary}
 Source: ${newsItem.source}
+Published: ${newsItem.publishedAt.toISOString()}
 
-Provide:
-1. Confidence level (high/medium/low) - Is this verified fact, credible report, or rumor/speculation?
-2. Market impact (bullish/bearish/neutral) - How does this affect silver prices?
-3. Brief analysis (1-2 sentences explaining why)
+First, determine if this is ACTUAL NEWS (recent events, price movements, market developments, policy changes, supply/demand updates) or just general commentary/education.
 
-Respond ONLY with valid JSON in this exact format:
-{"confidence": "high", "impact": "bullish", "analysis": "explanation here"}`;
+If it's NOT news (just general info, evergreen content, tutorials), respond with:
+{"isNews": false, "confidence": "low", "impact": "neutral", "analysis": "Not time-sensitive news"}
+
+If it IS news, provide:
+1. isNews: true
+2. Confidence level (high/medium/low) - Is this verified fact, credible report, or speculation?
+3. Market impact (bullish/bearish/neutral) - How does this affect silver prices?
+4. Brief analysis (1-2 sentences explaining the market impact)
+
+Respond ONLY with valid JSON:
+{"isNews": true/false, "confidence": "high/medium/low", "impact": "bullish/bearish/neutral", "analysis": "explanation"}`;
 
     const response = await axios.post(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
@@ -239,6 +246,13 @@ Respond ONLY with valid JSON in this exact format:
       const jsonMatch = result.match(/\{[^}]+\}/);
       if (jsonMatch) {
         const analysis = JSON.parse(jsonMatch[0]);
+        
+        // Filter out non-news items
+        if (analysis.isNews === false) {
+          console.log(`[News AI] ❌ Filtered out (not news): ${newsItem.title.substring(0, 50)}...`);
+          return null as any; // Will be filtered out later
+        }
+        
         newsItem.confidence = analysis.confidence;
         newsItem.impact = analysis.impact;
         newsItem.aiAnalysis = analysis.analysis;
@@ -276,12 +290,15 @@ export async function getSilverNews(limit: number = 10): Promise<SilverNewsItem[
     newsItems.sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime());
 
     // Analyze each news item with AI (in parallel, limit to avoid rate limits)
-    const itemsToAnalyze = newsItems.slice(0, Math.min(limit, 8));
-    newsItems = await Promise.all(
+    const itemsToAnalyze = newsItems.slice(0, Math.min(limit, 15)); // Fetch more since some will be filtered
+    const analyzedItems = await Promise.all(
       itemsToAnalyze.map(item => analyzeNewsWithAI(item))
     );
+    
+    // Filter out non-news items (nulls) and limit to requested amount
+    newsItems = analyzedItems.filter(item => item !== null).slice(0, limit);
 
-    console.log(`[News] ✅ Returning ${newsItems.length} AI-analyzed news items (newest first)`);
+    console.log(`[News] ✅ Returning ${newsItems.length} validated news items (newest first)`);
     return newsItems;
 
   } catch (error) {
