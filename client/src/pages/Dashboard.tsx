@@ -103,6 +103,14 @@ export default function Dashboard() {
     refetchInterval: autoRefresh ? refreshInterval : false,
   });
 
+  const { data: shanghaiData } = trpc.silver.getShanghaiPrice.useQuery(undefined, {
+    refetchInterval: autoRefresh ? refreshInterval : false,
+  });
+
+  const { data: cmeMarginData } = trpc.silver.getCMEMargins.useQuery(undefined, {
+    refetchInterval: autoRefresh ? refreshInterval : false,
+  });
+
   // Fetch real silver news with AI analysis
   const { data: realNews } = trpc.silver.getSilverNews.useQuery(
     { limit: 15 },
@@ -259,13 +267,13 @@ export default function Dashboard() {
       description: `COMEX spot silver price. ${spotData?.dataSource === 'fallback' ? '⚠️ Using fallback data - live data unavailable. ' : spotData?.dataSource === 'cached' ? '📦 Cached data. ' : '✅ Live data. '}Current trend based on 24-hour change.`
     },
     shanghaiPremium: {
-      value: 11.56,
-      status: "warning",
-      lastUpdate: Date.now() - 3600000,
+      value: (shanghaiData && !isNaN(shanghaiData.premium)) ? shanghaiData.premium : null,
+      status: !shanghaiData || isNaN(shanghaiData.premium) ? "unknown" : (shanghaiData.premium > 15 ? "critical" : shanghaiData.premium > 10 ? "warning" : "normal"),
+      lastUpdate: shanghaiData?.timestamp || Date.now(),
       trend: "up",
-      change24h: +15.8,
-      implication: "Decoupling starting",
-      description: "Shanghai Gold Exchange premium over COMEX spot. Rising premium indicates physical shortage in China and paper/physical market decoupling. >$15 is critical threshold."
+      change24h: 0,
+      implication: !shanghaiData || isNaN(shanghaiData.premium) ? "Data unavailable" : (shanghaiData.premium > 15 ? "Critical decoupling" : "Monitoring"),
+      description: `Shanghai Gold Exchange premium over COMEX spot. ${!shanghaiData || isNaN(shanghaiData.premium) ? '⚠️ Data unavailable. ' : shanghaiData.dataSource === 'cached' ? '📦 Cached data. ' : '✅ Live data. '}Rising premium indicates physical shortage in China and paper/physical market decoupling. >$15 is critical threshold.`
     },
     comexRegistered: {
       value: comexData?.registered || 127.26,      status: !comexData || comexData.dataSource === 'fallback' ? "unknown" : (comexData.registered < 25 ? "crisis" : comexData.registered < 35 ? "warning" : "normal"),
@@ -276,22 +284,22 @@ export default function Dashboard() {
       description: `Available silver for immediate delivery at COMEX warehouses (Registered inventory only). ${comexData?.dataSource === 'fallback' ? '⚠️ Using fallback data - live data unavailable. ' : comexData?.dataSource === 'cached' ? '📦 Cached data. ' : '✅ Live data. '}Declining inventory indicates delivery pressure. <25M oz triggers force majeure risk, <35M oz is warning level.`
     },
     cmeMargins: {
-      value: 32500,
-      status: "critical",
-      lastUpdate: Date.now() - 7200000,
-      trend: "up",
-      change24h: +62.5,
-      implication: "Extreme stress",
-      description: "CME maintenance margin requirement per silver contract (5,000 oz). Rising margins suppress price through forced liquidation. +80% in one week indicates panic."
+      value: cmeMarginData?.maintenanceMargin || null,
+      status: !cmeMarginData ? "unknown" : (cmeMarginData.maintenanceMargin > 20000 ? "critical" : cmeMarginData.maintenanceMargin > 15000 ? "warning" : "normal"),
+      lastUpdate: cmeMarginData?.timestamp || Date.now(),
+      trend: (cmeMarginData?.changePercent || 0) > 0 ? "up" : "down",
+      change24h: cmeMarginData?.changePercent || 0,
+      implication: !cmeMarginData ? "Data unavailable" : (cmeMarginData.changePercent > 50 ? "Extreme stress" : "Monitoring"),
+      description: `CME maintenance margin requirement per silver contract (5,000 oz). ${!cmeMarginData ? '⚠️ Data unavailable. ' : cmeMarginData.dataSource === 'cached' ? '📦 Cached data. ' : '✅ Live data. '}Rising margins suppress price through forced liquidation. +80% in one week indicates panic.`
     },
     physicalPremiums: {
-      value: 8.99,
-      status: "warning",
-      lastUpdate: Date.now() - 14400000,
-      trend: "up",
-      change24h: +12.5,
-      implication: "3-4x normal",
-      description: "Retail dealer premiums over spot (APMEX, JM Bullion). Normal: $2-4. Current: $8-12. Rising premiums indicate retail shortage and panic buying."
+      value: null, // No reliable API for retail premiums yet
+      status: "unknown",
+      lastUpdate: Date.now(),
+      trend: "unknown",
+      change24h: 0,
+      implication: "Data unavailable",
+      description: "⚠️ Retail dealer premiums over spot (APMEX, JM Bullion) - Data source not yet implemented. Manual check recommended at dealer websites."
     },
     slvSivrDivergence: {
       value: slvSivrData?.divergencePercent || 0.15,
@@ -311,7 +319,7 @@ export default function Dashboard() {
       implication: deliveryStressData?.interpretation || "Calculating...",
       description: "Composite index (0-100) measuring delivery pressure: inventory levels, coverage ratio, premiums, and margin requirements. >80 indicates imminent force majeure risk."
     },
-  }), [spotData, comexData, deliveryStressData]); // Update when real data changes
+  }), [spotData, comexData, deliveryStressData, shanghaiData, cmeMarginData, slvSivrData]); // Update when real data changes
 
   // Historical price data for Shanghai and COMEX (daily data points)
   const priceData = useMemo(() => {
@@ -497,7 +505,7 @@ export default function Dashboard() {
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
                     <span className="text-muted-foreground">Current Value:</span>
-                    <p className="font-semibold">{metric.value.toFixed(2)}{unit}</p>
+                    <p className="font-semibold">{metric.value !== null ? `${metric.value.toFixed(2)}${unit}` : 'N/A'}</p>
                   </div>
                   <div>
                     <span className="text-muted-foreground">24h Change:</span>
@@ -524,7 +532,7 @@ export default function Dashboard() {
       </div>
       <div className="flex items-baseline gap-1 mb-1">
         <span className={`text-2xl font-display font-black ${getStatusColor(metric.status)}`}>
-          {metric.value.toFixed(2)}{unit}
+          {metric.value !== null ? `${metric.value.toFixed(2)}${unit}` : '---'}
         </span>
         {showPercentage && (
           <Badge className={`${getStatusBadge(metric.status)} text-xs px-1 py-0`}>
