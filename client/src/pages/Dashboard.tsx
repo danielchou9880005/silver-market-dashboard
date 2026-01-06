@@ -95,6 +95,10 @@ export default function Dashboard() {
     refetchInterval: autoRefresh ? refreshInterval : false,
   });
 
+  const { data: physicalPremiumData } = trpc.silver.getPhysicalPremiums.useQuery(undefined, {
+    refetchInterval: autoRefresh ? refreshInterval : false,
+  });
+
   const { data: comexData } = trpc.silver.getComexInventory.useQuery(undefined, {
     refetchInterval: autoRefresh ? refreshInterval : false,
   });
@@ -293,13 +297,13 @@ export default function Dashboard() {
       description: `CME maintenance margin requirement per silver contract (5,000 oz). ${!cmeMarginData ? '⚠️ Data unavailable. ' : cmeMarginData.dataSource === 'cached' ? '📦 Cached data. ' : '✅ Live data. '}Rising margins suppress price through forced liquidation. +80% in one week indicates panic.`
     },
     physicalPremiums: {
-      value: null, // No reliable API for retail premiums yet
-      status: "unknown",
-      lastUpdate: Date.now(),
+      value: physicalPremiumData?.premium || null,
+      status: !physicalPremiumData || physicalPremiumData.dataSource === 'fallback' ? "unknown" : (physicalPremiumData.premium > 10 ? "critical" : physicalPremiumData.premium > 7 ? "warning" : "normal"),
+      lastUpdate: physicalPremiumData?.timestamp || Date.now(),
       trend: "unknown",
       change24h: 0,
-      implication: "Data unavailable",
-      description: "⚠️ Retail dealer premiums over spot (APMEX, JM Bullion) - Data source not yet implemented. Manual check recommended at dealer websites."
+      implication: !physicalPremiumData || physicalPremiumData.dataSource === 'fallback' ? "Data unavailable" : (physicalPremiumData.premium > 10 ? "High demand" : "Normal"),
+      description: `Retail dealer premiums over spot (averaged from APMEX, JM Bullion). ${!physicalPremiumData || physicalPremiumData.dataSource === 'fallback' ? '⚠️ Data unavailable. ' : '✅ Live data. '}Rising premiums indicate retail demand surge. >$10/oz is critical, $7-10 is elevated.`
     },
     slvSivrDivergence: {
       value: slvSivrData?.divergencePercent || 0.15,

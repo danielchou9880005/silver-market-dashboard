@@ -12,6 +12,7 @@ import { getShanghaiPrice } from "./scrapers/shanghaiPrice";
 import { getETFPrices } from "./scrapers/etfPrices";
 import { getCMEMargins } from "./scrapers/cmeMargins";
 import { calculateDeliveryStressIndex } from "./scrapers/deliveryStressIndex";
+import { getPhysicalPremiums } from "./scrapers/physicalPremiums";
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -234,6 +235,27 @@ export const appRouter = router({
             marginScore: 5,
           },
           interpretation: 'Unable to calculate stress index',
+          timestamp: Date.now(),
+        };
+      }
+    }),
+
+    // Get physical silver premiums from dealers
+    getPhysicalPremiums: publicProcedure.query(async () => {
+      try {
+        const premiumData = await getPhysicalPremiums();
+        return {
+          premium: premiumData.premium,
+          dataSource: premiumData.dataSource,
+          error: premiumData.error,
+          timestamp: premiumData.timestamp.getTime(),
+        };
+      } catch (error) {
+        console.error("Error fetching physical premiums:", error);
+        return {
+          premium: 0,
+          dataSource: 'fallback' as const,
+          error: 'Failed to fetch physical premiums',
           timestamp: Date.now(),
         };
       }
