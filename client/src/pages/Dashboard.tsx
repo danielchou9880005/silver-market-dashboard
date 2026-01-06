@@ -99,6 +99,10 @@ export default function Dashboard() {
     refetchInterval: autoRefresh ? refreshInterval : false,
   });
 
+  const { data: deliveryStressData } = trpc.silver.getDeliveryStressIndex.useQuery(undefined, {
+    refetchInterval: autoRefresh ? refreshInterval : false,
+  });
+
   // Fetch real silver news with AI analysis
   const { data: realNews } = trpc.silver.getSilverNews.useQuery(
     { limit: 15 },
@@ -299,15 +303,15 @@ export default function Dashboard() {
       description: "Price difference between SLV (unallocated) and SIVR (allocated). Divergence indicates force majeure risk as allocated ETFs trade at premium."
     },
     deliveryStress: {
-      value: 85,
-      status: "critical",
-      lastUpdate: Date.now() - 10800000,
+      value: deliveryStressData?.index || 0,
+      status: deliveryStressData?.level?.toLowerCase() || "unknown",
+      lastUpdate: deliveryStressData?.timestamp || Date.now(),
       trend: "up",
-      change24h: +8.5,
-      implication: "Pressure building",
-      description: "Composite index (0-100) measuring delivery pressure: notices vs inventory, Shanghai premium, margin hikes. >80 indicates imminent force majeure risk."
+      change24h: 0, // Would need historical data to calculate
+      implication: deliveryStressData?.interpretation || "Calculating...",
+      description: "Composite index (0-100) measuring delivery pressure: inventory levels, coverage ratio, premiums, and margin requirements. >80 indicates imminent force majeure risk."
     },
-  }), [spotData, comexData]); // Update when real data changes
+  }), [spotData, comexData, deliveryStressData]); // Update when real data changes
 
   // Historical price data for Shanghai and COMEX (daily data points)
   const priceData = useMemo(() => {
