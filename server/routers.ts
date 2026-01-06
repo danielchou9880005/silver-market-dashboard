@@ -125,7 +125,7 @@ export const appRouter = router({
     getShanghaiPrice: publicProcedure.query(async () => {
       try {
         const spotData = await getSilverPrice();
-        const shanghai = await getShanghaiPrice(spotData.bid);
+        const shanghai = await getShanghaiPrice(spotData.price);
         return {
           priceUSD: shanghai.priceUSD,
           premium: shanghai.premium,
