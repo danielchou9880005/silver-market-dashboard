@@ -43,7 +43,7 @@ export async function getShanghaiPrice(comexSpotPrice: number): Promise<Shanghai
     // This is a placeholder - actual parsing would depend on the API structure
     
     // For now, calculate estimated Shanghai price based on typical premium
-    const typicalPremium = 0.50; // Typical $0.50/oz premium
+    const typicalPremium = 0.50; // Typical $0.50/oz premium (HARDCODED FALLBACK)
     const shanghaiPriceUSD = comexSpotPrice + typicalPremium;
     const shanghaiPriceCNY = (shanghaiPriceUSD / GRAMS_PER_OZ) / CNY_TO_USD;
 
@@ -51,7 +51,8 @@ export async function getShanghaiPrice(comexSpotPrice: number): Promise<Shanghai
       price: shanghaiPriceCNY,
       priceUSD: shanghaiPriceUSD,
       premium: typicalPremium,
-      dataSource: 'live',
+      dataSource: 'fallback', // Changed from 'live' - this is hardcoded, not real data
+      error: 'Using estimated premium - real SGE data not available',
       timestamp: new Date()
     };
 

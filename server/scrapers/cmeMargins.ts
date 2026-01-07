@@ -36,19 +36,21 @@ export async function getCMEMargins(): Promise<CMEMarginData> {
     // Parse margin data from HTML
     // Note: This is a placeholder - actual parsing would require HTML parsing
     
-    // For now, use known recent margin requirements
+    // For now, use known recent margin requirements (HARDCODED FALLBACK)
     // These should be updated when CME changes margins
-    const initialMargin = 16250; // USD per contract (as of recent data)
-    const maintenanceMargin = 14750; // USD per contract
+    // NOTE: Margins increased 3 times in Dec 2024: ~$15k → $32k (+113%)
+    const initialMargin = 35200; // USD per contract (as of Jan 2025)
+    const maintenanceMargin = 32000; // USD per contract
     const marginPerOz = initialMargin / 5000; // Per ounce
-    const changePercent = 62.5; // Recent increase percentage
+    const changePercent = 113; // Recent increase percentage from $15k to $32k
 
     const result: CMEMarginData = {
       initialMargin,
       maintenanceMargin,
       marginPerOz,
       changePercent,
-      dataSource: 'live',
+      dataSource: 'fallback', // Changed from 'live' - this is hardcoded, not scraped
+      error: 'Using known margin requirements - real-time scraping not implemented',
       timestamp: new Date()
     };
 
@@ -68,10 +70,10 @@ export async function getCMEMargins(): Promise<CMEMarginData> {
 
     // Fallback to known recent margins
     const fallbackResult: CMEMarginData = {
-      initialMargin: 16250,
-      maintenanceMargin: 14750,
-      marginPerOz: 3.25,
-      changePercent: 62.5,
+      initialMargin: 35200,
+      maintenanceMargin: 32000,
+      marginPerOz: 7.04,
+      changePercent: 113,
       dataSource: 'fallback',
       error: 'Using known margin requirements',
       timestamp: new Date()
